@@ -76,7 +76,9 @@ class ServerTests(unittest.TestCase):
             thread.start()
             try:
                 url = f"http://127.0.0.1:{server.server_port}/list_files"
-                payload = json.dumps({"path": ".", "recursive": True}).encode("utf-8")
+                (root / "nested").mkdir()
+                (root / "nested" / "inside.txt").write_text("inside", encoding="utf-8")
+                payload = json.dumps({"path": "."}).encode("utf-8")
                 request = Request(
                     url,
                     data=payload,
@@ -91,7 +93,42 @@ class ServerTests(unittest.TestCase):
                 body = json.loads(response.read().decode("utf-8"))
 
                 self.assertEqual(response.status, 200)
-                self.assertEqual(body["entries"][0]["path"], "hello.txt")
+                paths = [entry["path"] for entry in body["entries"]]
+                self.assertIn("hello.txt", paths)
+                self.assertIn("nested", paths)
+                self.assertNotIn("nested/inside.txt", paths)
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+    def test_authorized_read_files_action_returns_batch_results(self):
+        with tempfile.TemporaryDirectory() as workspace:
+            root = Path(workspace)
+            (root / "one.txt").write_text("one\ntwo\n", encoding="utf-8")
+            server = create_server(
+                AppConfig(
+                    token="secret-token",
+                    workspaces={"default": root},
+                    active_workspace="default",
+                    host="127.0.0.1",
+                    port=0,
+                    public_base_url="https://actions.example.com",
+                )
+            )
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                body = post_json(
+                    f"http://127.0.0.1:{server.server_port}/read_files",
+                    {"files": [{"path": "one.txt", "start_line": 2, "end_line": 2}, {"path": "missing.txt"}], "line_numbers": True},
+                )
+
+                self.assertEqual(body["files"][0]["content"], "2 | two\n")
+                self.assertTrue(body["files"][0]["exists"])
+                self.assertEqual(body["files"][0]["start_line"], 2)
+                self.assertEqual(body["files"][0]["end_line"], 2)
+                self.assertEqual(body["files"][1]["error"]["code"], "file_not_found")
             finally:
                 server.shutdown()
                 server.server_close()
@@ -121,9 +158,11 @@ class ServerTests(unittest.TestCase):
             try:
                 base = f"http://127.0.0.1:{server.server_port}"
                 status = post_json(base + "/workspace_status", {})
-                self.assertEqual(status["active_workspace"], "alpha")
+                self.assertEqual(status["active_workspace"]["name"], "alpha")
+                self.assertEqual([item["name"] for item in status["workspaces"]], ["alpha", "beta"])
                 switched = post_json(base + "/switch_workspace", {"name": "beta"})
-                self.assertEqual(switched["active_workspace"], "beta")
+                self.assertEqual(switched["active_workspace"]["name"], "beta")
+                self.assertEqual([item["name"] for item in switched["workspaces"]], ["alpha", "beta"])
                 listing = post_json(base + "/list_files", {"path": ".", "recursive": True})
                 self.assertEqual(listing["entries"][0]["path"], "beta.txt")
                 persisted = json.loads(config_path.read_text(encoding="utf-8"))
@@ -164,7 +203,7 @@ class ServerTests(unittest.TestCase):
 
                 self.assertEqual(raised.exception.code, 403)
                 body = json.loads(raised.exception.read().decode("utf-8"))
-                self.assertEqual(body["error"], "access session expired")
+                self.assertEqual(body["error"]["code"], "access_expired")
             finally:
                 server.shutdown()
                 server.server_close()
@@ -200,7 +239,7 @@ class ServerTests(unittest.TestCase):
                     },
                 )
                 initial = json.loads(open_without_proxy(initial_request).read().decode("utf-8"))
-                self.assertEqual(initial["active_workspace"], "default")
+                self.assertEqual(initial["active_workspace"]["name"], "default")
 
                 config.token = "new-token"
                 save_config(config, config_path, overwrite=True)

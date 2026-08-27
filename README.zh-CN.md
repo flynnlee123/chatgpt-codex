@@ -138,7 +138,7 @@ chatgpt-codex verify
 
 `chatgpt-preflight` 会打印 ChatGPT 侧前提条件、登录入口、Builder 自动化边界，以及从当前本地配置推导出的 Builder 字段；它不会打印 bearer token 原文。
 
-`api-smoke` 会启动一个临时本地服务并直接测试 Action 接口：鉴权、健康检查、schema、workspace 状态、workspace 列表、文件列表/读取/写入/搜索/补丁、命令执行、workspace 切换和安全拦截。它不会触碰你的真实 workspace。
+`api-smoke` 会启动一个临时本地服务并直接测试 Action 接口：鉴权、健康检查、schema、workspace 状态/列表、有限深度文件列表、扁平行范围读取和批量读取、带上下文搜索、文件写入/补丁、结构化命令执行、workspace 切换和安全拦截。它不会触碰你的真实 workspace。
 
 ## Builder 自动化
 
@@ -203,7 +203,7 @@ chatgpt-codex channel renew --ttl-minutes 120
 8. 用 `channel renew --public-base-url <url>` 或 `set-public-url` 保存最终公网 URL。
 9. 先运行 `api-smoke` 做直接接口测试，再对运行中的入口运行 `verify`。
 10. 用 `builder configure --mode ui` 配置 ChatGPT Builder，或在 route 验证后使用 `builder sniff` 加 `builder configure --mode api`。
-11. 在 GPT 对话里，文件或命令操作前使用 `workspace_status`、`list_workspaces` 和 `switch_workspace`。
+11. 在 GPT 对话里，文件或命令操作前使用 `getWorkspaceStatus` 和 `switchWorkspace`。
 
 ## 手动配置
 
@@ -285,7 +285,7 @@ chatgpt-codex workspace list
 列一下当前目录
 ```
 
-GPT 应调用 `workspace_status`、`list_workspaces` 和 `switch_workspace`，并在文件、代码或命令操作前显示当前本地目录。
+GPT 应调用 `getWorkspaceStatus` 和 `switchWorkspace`，并在文件、代码或命令操作前显示当前本地目录。`getWorkspaceStatus` 已包含授权 workspace 列表。
 
 ## ChatGPT Builder 配置
 
@@ -333,13 +333,17 @@ chatgpt-codex gpt-instructions
 
 - `list_files`：列出文件和目录。
 - `read_file`：读取 UTF-8 文件。
+- `read_files`：一次读取多个已知 UTF-8 文件。
 - `search_text`：搜索 workspace 文本。
 - `write_file`：创建或替换文件。
 - `apply_patch`：应用受限的 `apply_patch` 风格补丁。
 - `exec_command`：通过安全检查后执行 shell 命令。
 - `workspace_status`：显示当前 workspace 名称和本地路径。
-- `list_workspaces`：列出已授权 workspaces。
 - `switch_workspace`：按名称切换到已授权 workspace。
+
+文件系统 primitive 会返回结构化字节数和截断元数据。`list_files` 默认只列出浅层内容（`recursive: false`），并支持有限 `max_depth` 以及 `include`/`exclude` glob；`read_file` 支持扁平的可选 `start_line`/`end_line` 和行号；`read_files` 保留结构化 `files` 数组，但每个元素使用扁平的 `start_line`/`end_line`，并支持单文件与总字节预算；`search_text` 支持大小写、正则、glob、前后文和输出限制；`exec_command` 会返回耗时、字节数、输出截断、超时状态，非零退出码也作为正常命令结果返回。
+
+公开 Action 返回字段保持精简且统一：文件路径统一使用 `path`，文件大小使用 `size_bytes` 和 `returned_bytes`，代码行范围使用 `start_line` 和 `end_line`，搜索命中使用 `matched_text` 和 `line_text`；`workspace_status` 返回一个 `active_workspace` 对象、授权 `workspaces` 列表和 `access`；错误统一为 `{error: {code, message}}`。
 
 ## 安全模型
 

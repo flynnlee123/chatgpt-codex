@@ -76,8 +76,8 @@ Do not ask for my ChatGPT password, browser cookies, OpenAI API key, or unrelate
 - 用户授权浏览器自动化后，用 `chatgpt-codex builder open-login` 和 `chatgpt-codex builder doctor` 打开并检查 ChatGPT Builder。
 - If internal API acceleration is needed, run `chatgpt-codex builder sniff`, replay only in the same Playwright browser context, then refresh and verify. Stop if the editor or Actions section is unavailable.
 - 如果需要内部 API 加速，运行 `chatgpt-codex builder sniff`；replay 只能在同一个 Playwright 浏览器会话中进行，然后刷新并验证。如果编辑器或 Actions 区域不可用，停止。
-- Ensure GPT instructions mention `workspace_status`, `list_workspaces`, and `switch_workspace` for showing and switching the current local directory.
-- 确保 GPT Instructions 写明用 `workspace_status`、`list_workspaces` 和 `switch_workspace` 显示并切换当前本地目录。
+- Ensure GPT instructions mention `workspace_status` and `switch_workspace` for showing and switching the current local directory; `workspace_status` includes the authorized workspace list.
+- 确保 GPT Instructions 写明用 `workspace_status` 和 `switch_workspace` 显示并切换当前本地目录；`workspace_status` 已包含授权 workspace 列表。
 - Run `chatgpt-codex api-smoke` before browser work to test the Action interfaces directly in temporary workspaces.
 - 浏览器操作前运行 `chatgpt-codex api-smoke`，在临时工作区里直接测试 Action 接口。
 - Use `chatgpt-codex channel status` to inspect registration without leaking the token. Use `chatgpt-codex channel revoke` to disable the channel, and `chatgpt-codex channel renew` to reactivate it.

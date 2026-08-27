@@ -74,7 +74,7 @@ Do not ask for my ChatGPT password, browser cookies, OpenAI API key, or unrelate
 - `chatgpt-codex verify` 通过。
 - Builder fields printed.
 - 已打印 Builder 字段。
-- GPT instructions include `workspace_status`, `list_workspaces`, and `switch_workspace`, and require showing the current local directory after each switch.
-- GPT Instructions 包含 `workspace_status`、`list_workspaces` 和 `switch_workspace`，并要求每次切换后显示当前本地目录。
+- GPT instructions include `workspace_status` and `switch_workspace`, and require showing the current local directory after each switch; `workspace_status` includes the authorized workspace list.
+- GPT Instructions 包含 `workspace_status` 和 `switch_workspace`，并要求每次切换后显示当前本地目录；`workspace_status` 已包含授权工作区列表。
 - If browser automation is approved, ChatGPT Builder configured after the user logs in manually.
 - 如果用户授权浏览器自动化，已在用户手动登录后配置 ChatGPT Builder。

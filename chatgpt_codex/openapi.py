@@ -12,7 +12,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
         "openapi": "3.1.0",
         "info": {
             "title": "ChatGPT Codex Local Actions",
-            "version": "0.1.0",
+            "version": "0.4.0",
             "description": "Local workspace coding actions for a user-owned ChatGPT Custom GPT. / 给用户自己的 Custom GPT 使用的本地工作区编程 Actions。",
         },
         "servers": [{"url": base_url}],
@@ -27,17 +27,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
                     "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _optional_request_body("EmptyRequest"),
-                    "responses": {"200": _json_response("Workspace status", "WorkspaceStatusResult")},
-                }
-            },
-            "/list_workspaces": {
-                "post": {
-                    "operationId": "listWorkspaces",
-                    "summary": "List authorized workspaces that can be selected in this GPT chat. / 列出此 GPT 对话中可切换的已授权工作区。",
-                    "x-openai-isConsequential": False,
-                    "security": [{"bearerAuth": []}],
-                    "requestBody": _optional_request_body("EmptyRequest"),
-                    "responses": {"200": _json_response("Workspace list", "WorkspaceListResult")},
+                    "responses": _action_responses("Workspace status", "WorkspaceStatusResult"),
                 }
             },
             "/switch_workspace": {
@@ -46,37 +36,47 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
                     "summary": "Switch the active workspace by authorized workspace name. / 按已授权工作区名称切换当前工作区。",
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("SwitchWorkspaceRequest"),
-                    "responses": {"200": _json_response("Workspace status", "WorkspaceStatusResult")},
+                    "responses": _action_responses("Workspace status", "WorkspaceStatusResult"),
                 }
             },
             "/list_files": {
                 "post": {
                     "operationId": "listFiles",
-                    "summary": "List files and directories inside the configured workspace. / 列出配置工作区内的文件和目录。",
+                    "summary": "List files and directories inside the active workspace with bounded depth and include/exclude globs. Use shallow depth first when exploring an unfamiliar project. / 在当前工作区内按有限深度和 include/exclude glob 列出文件与目录；探索陌生项目时先使用浅层深度。",
                     "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("ListFilesRequest"),
-                    "responses": {"200": _json_response("File listing", "FileListingResult")},
+                    "responses": _action_responses("File listing", "FileListingResult"),
                 }
             },
             "/read_file": {
                 "post": {
                     "operationId": "readFile",
-                    "summary": "Read a UTF-8 file inside the configured workspace. / 读取配置工作区内的 UTF-8 文件。",
+                    "summary": "Read a UTF-8 file inside the active workspace. Supports optional line ranges for reading only the relevant section of large source files. Prefer line ranges after locating a symbol with searchText. / 读取当前工作区内的 UTF-8 文件；支持按行范围读取大源文件的相关片段，搜索到符号后优先使用行范围。",
                     "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("ReadFileRequest"),
-                    "responses": {"200": _json_response("File content", "ReadFileResult")},
+                    "responses": _action_responses("File content", "ReadFileResult"),
+                }
+            },
+            "/read_files": {
+                "post": {
+                    "operationId": "readFiles",
+                    "summary": "Read multiple known UTF-8 workspace files in one call. Prefer this over repeated readFile calls when several independent files need to be inspected together. / 一次读取多个已知 UTF-8 工作区文件；需要同时查看多个独立文件时优先使用。",
+                    "x-openai-isConsequential": False,
+                    "security": [{"bearerAuth": []}],
+                    "requestBody": _request_body("ReadFilesRequest"),
+                    "responses": _action_responses("Batch file content", "ReadFilesResult"),
                 }
             },
             "/search_text": {
                 "post": {
                     "operationId": "searchText",
-                    "summary": "Search text inside workspace files. / 搜索工作区文件文本。",
+                    "summary": "Recursively search text inside workspace files with regex, include/exclude globs, surrounding context, and bounded results. Prefer this over execCommand with rg for normal source-code searches. / 在工作区文件中递归搜索文本，支持正则、include/exclude glob、上下文和结果限制；普通源码搜索优先使用此 Action。",
                     "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("SearchTextRequest"),
-                    "responses": {"200": _json_response("Search results", "SearchResult")},
+                    "responses": _action_responses("Search results", "SearchResult"),
                 }
             },
             "/write_file": {
@@ -86,7 +86,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
                     "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("WriteFileRequest"),
-                    "responses": {"200": _json_response("Write result", "WriteFileResult")},
+                    "responses": _action_responses("Write result", "WriteFileResult"),
                 }
             },
             "/apply_patch": {
@@ -96,17 +96,17 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
                     "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("PatchRequest"),
-                    "responses": {"200": _json_response("Patch result", "PatchResult")},
+                    "responses": _action_responses("Patch result", "PatchResult"),
                 }
             },
             "/exec_command": {
                 "post": {
                     "operationId": "execCommand",
-                    "summary": "Run a shell command inside the workspace after safety checks. / 通过安全检查后在工作区内运行 shell 命令。",
+                    "summary": "Run a shell command inside the active workspace after safety checks. Use for workflows that are not efficiently represented by the filesystem and search primitives. Non-zero exit codes are returned as command results. / 通过安全检查后在当前工作区内运行 shell 命令；适合基础文件和搜索工具难以表达的流程，非零退出码作为正常命令结果返回。",
                     "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("CommandRequest"),
-                    "responses": {"200": _json_response("Command result", "CommandResult")},
+                    "responses": _action_responses("Command result", "CommandResult"),
                 }
             },
         },
@@ -139,6 +139,13 @@ def _json_response(description: str, schema_name: str) -> Dict[str, object]:
     }
 
 
+def _action_responses(description: str, schema_name: str) -> Dict[str, object]:
+    return {
+        "200": _json_response(description, schema_name),
+        "default": _json_response("Action error", "ErrorResult"),
+    }
+
+
 def _schemas() -> Dict[str, object]:
     return {
         "HealthResult": _object(
@@ -146,6 +153,7 @@ def _schemas() -> Dict[str, object]:
                 "ok": {"type": "boolean"},
                 "active_workspace": {"type": "string"},
                 "public_base_url": {"type": "string"},
+                "access": {"$ref": "#/components/schemas/AccessStatus"},
             }
         ),
         "EmptyRequest": _object({}),
@@ -158,72 +166,158 @@ def _schemas() -> Dict[str, object]:
         ),
         "WorkspaceStatusResult": _object(
             {
-                "active_workspace": {"type": "string"},
-                "workspace": {"type": "string"},
+                "active_workspace": {"$ref": "#/components/schemas/ActiveWorkspace"},
                 "workspaces": {"type": "array", "items": {"$ref": "#/components/schemas/WorkspaceEntry"}},
+                "access": {"$ref": "#/components/schemas/AccessStatus"},
             }
         ),
-        "WorkspaceListResult": _object(
+        "ActiveWorkspace": _object(
             {
-                "active_workspace": {"type": "string"},
-                "workspaces": {"type": "array", "items": {"$ref": "#/components/schemas/WorkspaceEntry"}},
+                "name": {"type": "string"},
+                "path": {"type": "string"},
+            },
+            ["name", "path"],
+        ),
+        "AccessStatus": _object(
+            {
+                "mode": {"type": "string"},
+                "active": {"type": "boolean"},
+                "expires_at": {"type": "string"},
+                "seconds_remaining": {"type": ["integer", "null"]},
             }
         ),
         "SwitchWorkspaceRequest": _object({"name": {"type": "string"}}, ["name"]),
         "ListFilesRequest": _object(
             {
                 "path": {"type": "string", "default": "."},
-                "recursive": {"type": "boolean", "default": True},
+                "recursive": {"type": "boolean", "default": False},
+                "max_depth": {"type": "integer", "minimum": 0},
+                "include": {"type": "array", "items": {"type": "string"}},
+                "exclude": {"type": "array", "items": {"type": "string"}},
                 "pattern": {"type": "string", "default": "*"},
-                "max_results": {"type": "integer", "default": 200},
+                "max_results": {"type": "integer", "minimum": 1, "default": 200},
             }
         ),
         "FileEntry": _object(
             {
                 "path": {"type": "string"},
                 "type": {"type": "string", "enum": ["file", "directory"]},
-                "size": {"type": "integer"},
+                "size_bytes": {"type": "integer"},
                 "modified": {"type": "integer"},
+                "depth": {"type": "integer"},
             }
         ),
         "FileListingResult": _object(
             {
                 "path": {"type": "string"},
                 "entries": {"type": "array", "items": {"$ref": "#/components/schemas/FileEntry"}},
+                "total_entries": {"type": "integer"},
+                "returned_entries": {"type": "integer"},
                 "truncated": {"type": "boolean"},
+                "truncation_reason": {"type": "string"},
             }
         ),
-        "ReadFileRequest": _object({"path": {"type": "string"}, "max_bytes": {"type": "integer", "default": 200000}}, ["path"]),
+        "ReadFileRequest": _object(
+            {
+                "path": {"type": "string"},
+                "start_line": {"type": "integer", "minimum": 1},
+                "end_line": {"type": "integer", "minimum": 1},
+                "max_bytes": {"type": "integer", "minimum": 1, "default": 200000},
+                "line_numbers": {"type": "boolean", "default": False},
+            },
+            ["path"],
+        ),
         "ReadFileResult": _object(
             {
                 "path": {"type": "string"},
                 "content": {"type": "string"},
-                "bytes": {"type": "integer"},
+                "size_bytes": {"type": "integer"},
+                "returned_bytes": {"type": "integer"},
+                "start_line": {"type": "integer", "minimum": 1},
+                "end_line": {"type": "integer", "minimum": 1},
                 "truncated": {"type": "boolean"},
+                "truncation_reason": {"type": "string"},
+            }
+        ),
+        "ReadFileSpec": _object(
+            {
+                "path": {"type": "string"},
+                "start_line": {"type": "integer", "minimum": 1},
+                "end_line": {"type": "integer", "minimum": 1},
+            },
+            ["path"],
+        ),
+        "ReadFilesRequest": _object(
+            {
+                "files": {"type": "array", "items": {"$ref": "#/components/schemas/ReadFileSpec"}},
+                "max_bytes_per_file": {"type": "integer", "minimum": 1, "default": 30000},
+                "max_total_bytes": {"type": "integer", "minimum": 1, "default": 100000},
+                "line_numbers": {"type": "boolean", "default": False},
+            },
+            ["files"],
+        ),
+        "ReadFileBatchResult": _object(
+            {
+                "path": {"type": "string"},
+                "exists": {"type": "boolean"},
+                "size_bytes": {"type": "integer"},
+                "returned_bytes": {"type": "integer"},
+                "start_line": {"type": "integer", "minimum": 1},
+                "end_line": {"type": "integer", "minimum": 1},
+                "content": {"type": "string"},
+                "truncated": {"type": "boolean"},
+                "truncation_reason": {"type": "string"},
+                "error": {"$ref": "#/components/schemas/ErrorInfo"},
+            }
+        ),
+        "ReadFilesResult": _object(
+            {
+                "files": {"type": "array", "items": {"$ref": "#/components/schemas/ReadFileBatchResult"}},
+                "total_returned_bytes": {"type": "integer"},
+                "truncated": {"type": "boolean"},
+                "truncation_reason": {"type": "string"},
             }
         ),
         "SearchTextRequest": _object(
             {
                 "query": {"type": "string"},
                 "path": {"type": "string", "default": "."},
-                "max_results": {"type": "integer", "default": 100},
                 "regex": {"type": "boolean", "default": False},
+                "case_sensitive": {"type": "boolean", "default": True},
+                "include": {"type": "array", "items": {"type": "string"}},
+                "exclude": {"type": "array", "items": {"type": "string"}},
+                "context_before": {"type": "integer", "minimum": 0, "default": 0},
+                "context_after": {"type": "integer", "minimum": 0, "default": 0},
+                "max_results": {"type": "integer", "minimum": 1, "default": 100},
+                "max_output_bytes": {"type": "integer", "minimum": 1, "default": 200000},
             },
             ["query"],
+        ),
+        "SearchContextLine": _object(
+            {
+                "line": {"type": "integer"},
+                "text": {"type": "string"},
+                "is_match": {"type": "boolean"},
+            }
         ),
         "SearchMatch": _object(
             {
                 "path": {"type": "string"},
                 "line": {"type": "integer"},
                 "column": {"type": "integer"},
-                "text": {"type": "string"},
+                "matched_text": {"type": "string"},
+                "line_text": {"type": "string"},
+                "context": {"type": "array", "items": {"$ref": "#/components/schemas/SearchContextLine"}},
             }
         ),
         "SearchResult": _object(
             {
                 "query": {"type": "string"},
                 "matches": {"type": "array", "items": {"$ref": "#/components/schemas/SearchMatch"}},
+                "total_matches": {"type": "integer"},
+                "returned_matches": {"type": "integer"},
                 "truncated": {"type": "boolean"},
+                "truncation_reason": {"type": "string"},
             }
         ),
         "WriteFileRequest": _object({"path": {"type": "string"}, "content": {"type": "string"}}, ["path", "content"]),
@@ -235,6 +329,8 @@ def _schemas() -> Dict[str, object]:
                 "command": {"type": "string"},
                 "cwd": {"type": "string", "default": "."},
                 "timeout_seconds": {"type": "integer", "default": 60},
+                "max_stdout_bytes": {"type": "integer", "minimum": 1, "default": 20000},
+                "max_stderr_bytes": {"type": "integer", "minimum": 1, "default": 20000},
             },
             ["command"],
         ),
@@ -242,14 +338,31 @@ def _schemas() -> Dict[str, object]:
             {
                 "command": {"type": "string"},
                 "cwd": {"type": "string"},
-                "exit_code": {"type": "integer"},
+                "exit_code": {"type": ["integer", "null"]},
+                "duration_ms": {"type": "integer"},
                 "stdout": {"type": "string"},
                 "stderr": {"type": "string"},
+                "stdout_bytes": {"type": "integer"},
+                "stderr_bytes": {"type": "integer"},
                 "stdout_truncated": {"type": "boolean"},
                 "stderr_truncated": {"type": "boolean"},
+                "timed_out": {"type": "boolean"},
             }
         ),
-        "ErrorResult": _object({"error": {"type": "string"}}),
+        "ErrorInfo": _object(
+            {
+                "code": {"type": "string"},
+                "message": {"type": "string"},
+            },
+            ["code", "message"],
+        ),
+        "ErrorResult": _object(
+            {
+                "error": {"$ref": "#/components/schemas/ErrorInfo"},
+                "access": {"$ref": "#/components/schemas/AccessStatus"},
+            },
+            ["error"],
+        ),
     }
 
 

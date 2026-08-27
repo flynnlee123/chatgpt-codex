@@ -13,6 +13,7 @@ from urllib.error import HTTPError, URLError
 from urllib.request import ProxyHandler, Request, build_opener
 
 from .builder import (
+    DEFAULT_SYSTEM_INSTRUCTIONS,
     builder_route_map_path,
     builder_state_path,
     make_builder_payload,
@@ -819,14 +820,14 @@ def _api_smoke(timeout: int) -> dict:
         checks = []
         try:
             checks.append(_api_check("health", lambda: _api_get(f"{base_url}/health", timeout), lambda body: body["ok"] and body["active_workspace"] == "alpha"))
-            checks.append(_api_check("openapi", lambda: _api_get(f"{base_url}/openapi.json", timeout), lambda body: body["servers"][0]["url"] == base_url and "/exec_command" in body["paths"]))
+            checks.append(_api_check("openapi", lambda: _api_get(f"{base_url}/openapi.json", timeout), lambda body: body["servers"][0]["url"] == base_url and "/read_files" in body["paths"] and "/exec_command" in body["paths"] and "/list_workspaces" not in body["paths"]))
             checks.append(_api_check_status("auth_required", lambda: _api_post(f"{base_url}/workspace_status", {}, "", timeout), 401))
-            checks.append(_api_check("workspace_status", lambda: _api_post(f"{base_url}/workspace_status", {}, config.token, timeout), lambda body: body["active_workspace"] == "alpha" and body["workspace"] == str(alpha.resolve())))
-            checks.append(_api_check("list_workspaces", lambda: _api_post(f"{base_url}/list_workspaces", {}, config.token, timeout), lambda body: [item["name"] for item in body["workspaces"]] == ["alpha", "beta"]))
-            checks.append(_api_check("list_files", lambda: _api_post(f"{base_url}/list_files", {"path": ".", "recursive": False}, config.token, timeout), lambda body: body["entries"][0]["path"] == "alpha.txt"))
-            checks.append(_api_check("read_file", lambda: _api_post(f"{base_url}/read_file", {"path": "alpha.txt"}, config.token, timeout), lambda body: body["content"] == "alpha seed\n"))
+            checks.append(_api_check("workspace_status", lambda: _api_post(f"{base_url}/workspace_status", {}, config.token, timeout), lambda body: body["active_workspace"]["name"] == "alpha" and body["active_workspace"]["path"] == str(alpha.resolve()) and [item["name"] for item in body["workspaces"]] == ["alpha", "beta"]))
+            checks.append(_api_check("list_files", lambda: _api_post(f"{base_url}/list_files", {"path": "."}, config.token, timeout), lambda body: body["entries"][0]["path"] == "alpha.txt"))
+            checks.append(_api_check("read_file", lambda: _api_post(f"{base_url}/read_file", {"path": "alpha.txt", "start_line": 1, "end_line": 1, "line_numbers": True}, config.token, timeout), lambda body: body["content"] == "1 | alpha seed\n" and body["returned_bytes"] > 0 and body["start_line"] == 1 and body["end_line"] == 1))
             checks.append(_api_check("write_file", lambda: _api_post(f"{base_url}/write_file", {"path": "notes/api.txt", "content": "alpha line\nneedle\n"}, config.token, timeout), lambda body: body["bytes_written"] > 0))
-            checks.append(_api_check("search_text", lambda: _api_post(f"{base_url}/search_text", {"query": "needle", "path": "."}, config.token, timeout), lambda body: body["matches"][0]["path"] == "notes/api.txt"))
+            checks.append(_api_check("read_files", lambda: _api_post(f"{base_url}/read_files", {"files": [{"path": "alpha.txt"}, {"path": "notes/api.txt", "start_line": 1, "end_line": 2}, {"path": "missing.txt"}]}, config.token, timeout), lambda body: body["files"][1]["content"] == "alpha line\nneedle\n" and body["files"][2]["error"]["code"] == "file_not_found" and body["files"][1]["start_line"] == 1 and body["files"][1]["end_line"] == 2 and body["total_returned_bytes"] > 0))
+            checks.append(_api_check("search_text", lambda: _api_post(f"{base_url}/search_text", {"query": "needle", "path": ".", "context_before": 1, "context_after": 1}, config.token, timeout), lambda body: body["matches"][0]["path"] == "notes/api.txt" and body["matches"][0]["line_text"] == "needle" and body["matches"][0]["context"]))
             checks.append(
                 _api_check(
                     "apply_patch",
@@ -851,10 +852,10 @@ def _api_smoke(timeout: int) -> dict:
                     lambda body: body["changed_files"] == ["notes/api.txt"],
                 )
             )
-            checks.append(_api_check("read_after_patch", lambda: _api_post(f"{base_url}/read_file", {"path": "notes/api.txt"}, config.token, timeout), lambda body: "needle patched" in body["content"]))
+            checks.append(_api_check("read_after_patch", lambda: _api_post(f"{base_url}/read_file", {"path": "notes/api.txt", "start_line": 2, "end_line": 2, "line_numbers": True}, config.token, timeout), lambda body: body["content"] == "2 | needle patched\n" and body["start_line"] == 2 and body["end_line"] == 2))
             command = f"\"{sys.executable}\" -c \"from pathlib import Path; print(Path.cwd().name)\""
-            checks.append(_api_check("exec_command", lambda: _api_post(f"{base_url}/exec_command", {"command": command, "cwd": ".", "timeout_seconds": 10}, config.token, timeout), lambda body: body["exit_code"] == 0 and body["stdout"].strip() == "alpha"))
-            checks.append(_api_check("switch_workspace", lambda: _api_post(f"{base_url}/switch_workspace", {"name": "beta"}, config.token, timeout), lambda body: body["active_workspace"] == "beta" and body["workspace"] == str(beta.resolve())))
+            checks.append(_api_check("exec_command", lambda: _api_post(f"{base_url}/exec_command", {"command": command, "cwd": ".", "timeout_seconds": 10, "max_stdout_bytes": 1000}, config.token, timeout), lambda body: body["exit_code"] == 0 and body["stdout"].strip() == "alpha" and body["stdout_bytes"] > 0 and body["timed_out"] is False))
+            checks.append(_api_check("switch_workspace", lambda: _api_post(f"{base_url}/switch_workspace", {"name": "beta"}, config.token, timeout), lambda body: body["active_workspace"]["name"] == "beta" and body["active_workspace"]["path"] == str(beta.resolve())))
             checks.append(_api_check("list_files_after_switch", lambda: _api_post(f"{base_url}/list_files", {"path": ".", "recursive": False}, config.token, timeout), lambda body: body["entries"][0]["path"] == "beta.txt"))
             checks.append(_api_check_status("path_escape_blocked", lambda: _api_post(f"{base_url}/read_file", {"path": "../outside.txt"}, config.token, timeout), 400))
             checks.append(_api_check_status("dangerous_command_blocked", lambda: _api_post(f"{base_url}/exec_command", {"command": "rm -rf /tmp/nope"}, config.token, timeout), 400))
@@ -1097,11 +1098,7 @@ def _gpt_instructions(config: AppConfig) -> str:
 2. Instructions:
    Instructions / 指令：
 
-You are my local coding assistant for the workspace exposed through Actions.
-Use workspace_status before file, code, or command work so you can show the current local directory. Use list_workspaces and switch_workspace when I ask to view or switch projects. Only switch to authorized workspace names returned by list_workspaces. After switching, state the active workspace name and local path. Use list_files, read_file, search_text, write_file, apply_patch, and exec_command for project work. Inspect files before editing. Keep changes scoped. Do not run destructive commands unless I explicitly ask for that exact action in the current chat.
-
-你是我的本地编程助手，通过 Actions 访问我暴露的 workspace。
-当我询问文件、代码、命令或当前项目时，先使用 workspace_status 显示当前本地目录。当我要求查看或切换项目时，使用 list_workspaces 和 switch_workspace。只能切换到 list_workspaces 返回的已授权工作区名称。切换后说明当前工作区名称和本地路径。项目操作使用 list_files、read_file、search_text、write_file、apply_patch 和 exec_command。编辑前先检查文件。保持改动范围清晰。除非我在当前对话中明确要求执行某个危险操作，否则不要运行破坏性命令。
+{DEFAULT_SYSTEM_INSTRUCTIONS}
 
 3. Actions:
    Actions / 动作：

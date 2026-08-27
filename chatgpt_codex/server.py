@@ -10,7 +10,13 @@ from typing import Any, Callable, Dict, Optional
 from .config import AppConfig, load_config, save_config
 from .executor import CommandExecutor
 from .openapi import make_openapi_document
-from .workspace import WorkspaceTools
+from .workspace import (
+    DEFAULT_BATCH_MAX_BYTES_PER_FILE,
+    DEFAULT_BATCH_MAX_TOTAL_BYTES,
+    DEFAULT_READ_MAX_BYTES,
+    DEFAULT_SEARCH_MAX_OUTPUT_BYTES,
+    WorkspaceTools,
+)
 
 
 PRIVACY_TEXT = """ChatGPT Codex runs on your own computer.
@@ -51,6 +57,10 @@ def _redact_log_value(value: Any, key: str = "") -> Any:
     return value
 
 
+def _error_payload(code: str, message: str) -> Dict[str, object]:
+    return {"error": {"code": code, "message": message}}
+
+
 def create_server(config: AppConfig, config_file: Optional[Path] = None) -> ThreadingHTTPServer:
     """Create a bearer-protected HTTP action server.
 
@@ -84,7 +94,15 @@ def create_server(config: AppConfig, config_file: Optional[Path] = None) -> Thre
     def workspace_status() -> Dict[str, object]:
         with config_lock:
             reload_config_locked()
-            return config.workspace_status()
+            raw_status = config.workspace_status()
+            return {
+                "active_workspace": {
+                    "name": raw_status["active_workspace"],
+                    "path": raw_status["workspace"],
+                },
+                "workspaces": raw_status["workspaces"],
+                "access": raw_status["access"],
+            }
 
     def public_base_url() -> str:
         with config_lock:
@@ -94,9 +112,16 @@ def create_server(config: AppConfig, config_file: Optional[Path] = None) -> Thre
     def switch_workspace(name: str) -> Dict[str, object]:
         with config_lock:
             reload_config_locked()
-            result = config.switch_workspace(name)
+            raw_status = config.switch_workspace(name)
             persist_config()
-            return result
+            return {
+                "active_workspace": {
+                    "name": raw_status["active_workspace"],
+                    "path": raw_status["workspace"],
+                },
+                "workspaces": raw_status["workspaces"],
+                "access": raw_status["access"],
+            }
 
     class Handler(BaseHTTPRequestHandler):
         server_version = "ChatGPTCodex/0.1"
@@ -110,7 +135,7 @@ def create_server(config: AppConfig, config_file: Optional[Path] = None) -> Thre
                 self._send_json(
                     {
                         "ok": True,
-                        "active_workspace": status["active_workspace"],
+                        "active_workspace": status["active_workspace"]["name"],
                         "public_base_url": public_base_url(),
                         "access": status["access"],
                     }
@@ -122,7 +147,7 @@ def create_server(config: AppConfig, config_file: Optional[Path] = None) -> Thre
             if self.path == "/privacy":
                 self._send_text(PRIVACY_TEXT)
                 return
-            self._send_json({"error": "not found"}, status=404)
+            self._send_json(_error_payload("not_found", "not found"), status=404)
 
         def do_POST(self):
             auth_error = self._auth_error()
@@ -133,44 +158,68 @@ def create_server(config: AppConfig, config_file: Optional[Path] = None) -> Thre
             workspace_tools, executor = current_tools()
             actions: Dict[str, Callable[[Dict[str, Any]], Dict[str, object]]] = {
                 "/workspace_status": lambda body: workspace_status(),
-                "/list_workspaces": lambda body: {
-                    "active_workspace": workspace_status()["active_workspace"],
-                    "workspaces": workspace_status()["workspaces"],
-                },
                 "/switch_workspace": lambda body: switch_workspace(body["name"]),
                 "/list_files": lambda body: workspace_tools.list_files(
-                    body.get("path", "."),
-                    bool(body.get("recursive", True)),
-                    body.get("pattern", "*"),
-                    int(body.get("max_results", 200)),
+                    path=body.get("path", "."),
+                    recursive=bool(body.get("recursive", False)),
+                    pattern=body.get("pattern", "*"),
+                    max_results=int(body.get("max_results", 200)),
+                    max_depth=None if body.get("max_depth") is None else int(body["max_depth"]),
+                    include=body.get("include"),
+                    exclude=body.get("exclude"),
                 ),
-                "/read_file": lambda body: workspace_tools.read_file(body["path"], int(body.get("max_bytes", 200000))),
+                "/read_file": lambda body: workspace_tools.read_file(
+                    path=body["path"],
+                    max_bytes=int(body.get("max_bytes", DEFAULT_READ_MAX_BYTES)),
+                    start_line=None if body.get("start_line") is None else int(body["start_line"]),
+                    end_line=None if body.get("end_line") is None else int(body["end_line"]),
+                    line_numbers=bool(body.get("line_numbers", False)),
+                ),
+                "/read_files": lambda body: workspace_tools.read_files(
+                    files=body["files"],
+                    max_bytes_per_file=int(body.get("max_bytes_per_file", DEFAULT_BATCH_MAX_BYTES_PER_FILE)),
+                    max_total_bytes=int(body.get("max_total_bytes", DEFAULT_BATCH_MAX_TOTAL_BYTES)),
+                    line_numbers=bool(body.get("line_numbers", False)),
+                ),
                 "/search_text": lambda body: workspace_tools.search_text(
-                    body["query"],
-                    body.get("path", "."),
-                    int(body.get("max_results", 100)),
-                    bool(body.get("regex", False)),
+                    query=body["query"],
+                    path=body.get("path", "."),
+                    max_results=int(body.get("max_results", 100)),
+                    regex=bool(body.get("regex", False)),
+                    case_sensitive=bool(body.get("case_sensitive", True)),
+                    include=body.get("include"),
+                    exclude=body.get("exclude"),
+                    context_before=int(body.get("context_before", 0)),
+                    context_after=int(body.get("context_after", 0)),
+                    max_output_bytes=int(body.get("max_output_bytes", DEFAULT_SEARCH_MAX_OUTPUT_BYTES)),
                 ),
                 "/write_file": lambda body: workspace_tools.write_file(body["path"], body.get("content", "")),
                 "/apply_patch": lambda body: workspace_tools.apply_patch(body["patch"]),
                 "/exec_command": lambda body: executor.run(
-                    body["command"],
-                    body.get("cwd", "."),
-                    int(body.get("timeout_seconds", 60)),
+                    command=body["command"],
+                    cwd=body.get("cwd", "."),
+                    timeout_seconds=int(body.get("timeout_seconds", 60)),
+                    max_stdout_bytes=None if body.get("max_stdout_bytes") is None else int(body["max_stdout_bytes"]),
+                    max_stderr_bytes=None if body.get("max_stderr_bytes") is None else int(body["max_stderr_bytes"]),
                 ),
             }
             action = actions.get(self.path)
             if action is None:
-                self._send_json({"error": "not found"}, status=404)
+                self._send_json(_error_payload("not_found", "not found"), status=404)
                 return
             try:
                 body = self._read_json()
                 self._log_action_input(body)
                 self._send_json(action(body))
             except KeyError as exc:
-                self._send_json({"error": f"missing required field: {exc.args[0]}"}, status=400)
+                self._send_json(
+                    _error_payload("missing_field", f"missing required field: {exc.args[0]}"),
+                    status=400,
+                )
+            except ValueError as exc:
+                self._send_json(_error_payload("invalid_request", str(exc)), status=400)
             except Exception as exc:
-                self._send_json({"error": str(exc)}, status=400)
+                self._send_json(_error_payload("request_error", str(exc)), status=400)
 
         def log_message(self, format, *args):
             # Keep the standard HTTP access log, but send it to the process's
@@ -196,9 +245,11 @@ def create_server(config: AppConfig, config_file: Optional[Path] = None) -> Thre
                 expected = f"Bearer {config.token}"
                 access = config.access_status()
             if not hmac.compare_digest(self.headers.get("Authorization", ""), expected):
-                return {"error": "missing or invalid bearer token"}, 401
+                return _error_payload("unauthorized", "missing or invalid bearer token"), 401
             if not access["active"]:
-                return {"error": "access session expired", "access": access}, 403
+                payload = _error_payload("access_expired", "access session expired")
+                payload["access"] = access
+                return payload, 403
             return None
 
         def _read_json(self) -> Dict[str, Any]:

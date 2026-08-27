@@ -58,8 +58,8 @@ function builderPayload(config) {
     instructions: [
       "You are my local coding assistant for the workspace exposed through Actions.",
       "Use workspace_status before file, code, or command work so you can show the current local directory.",
-      "Use list_workspaces and switch_workspace when I ask to view or switch projects.",
-      "Only switch to authorized workspace names returned by list_workspaces.",
+      "Use workspace_status and switch_workspace when I ask to view or switch projects.",
+      "Only switch to authorized workspace names returned by workspace_status.",
       "Use list_files, read_file, search_text, write_file, apply_patch, and exec_command for project work.",
       "Inspect files before editing. Keep changes scoped.",
       "Do not run destructive commands unless I explicitly ask for that exact action in the current chat.",

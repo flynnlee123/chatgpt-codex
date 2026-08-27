@@ -138,7 +138,7 @@ chatgpt-codex verify
 
 `chatgpt-preflight` prints the ChatGPT-side prerequisites, the login URL, the Builder automation boundary, and the exact Builder fields derived from the current local config without printing the bearer token.
 
-`api-smoke` starts a temporary local server and tests the Action interfaces directly: auth, health, schema, workspace status, workspace listing, file list/read/write/search/patch, command execution, workspace switching, and safety blocks. It does not touch your real workspace.
+`api-smoke` starts a temporary local server and tests the Action interfaces directly: auth, health, schema, workspace status/listing, bounded file listing, flat line-range and batch reads, contextual search, file write/patch, structured command execution, workspace switching, and safety blocks. It does not touch your real workspace.
 
 ## Builder Automation
 
@@ -203,7 +203,7 @@ Low-level commands are still available for advanced use: `chatgpt-codex rotate-t
 8. Save the final public URL with `channel renew --public-base-url <url>` or `set-public-url`.
 9. Run `api-smoke` for direct interface testing, then `verify` against the running route.
 10. Configure ChatGPT Builder with `builder configure --mode ui`, or use `builder sniff` plus `builder configure --mode api` after route validation.
-11. In GPT chat, use `workspace_status`, `list_workspaces`, and `switch_workspace` before file or command work.
+11. In GPT chat, use `getWorkspaceStatus` and `switchWorkspace` before file or command work.
 
 ## Manual Setup
 
@@ -285,7 +285,7 @@ Switch to notes.
 List the current directory.
 ```
 
-The GPT should call `workspace_status`, `list_workspaces`, and `switch_workspace`, then show the active local directory before file, code, or command work.
+The GPT should call `getWorkspaceStatus` and `switchWorkspace`, then show the active local directory before file, code, or command work. `getWorkspaceStatus` includes the authorized workspace list.
 
 ## ChatGPT Builder Setup
 
@@ -333,13 +333,17 @@ In ChatGPT Builder:
 
 - `list_files`: list files and directories.
 - `read_file`: read a UTF-8 file.
+- `read_files`: read multiple known UTF-8 files in one call.
 - `search_text`: search workspace text.
 - `write_file`: create or replace a file.
 - `apply_patch`: apply a limited `apply_patch` style patch.
 - `exec_command`: run a shell command after safety checks.
 - `workspace_status`: show the active workspace name and local path.
-- `list_workspaces`: list authorized workspaces.
 - `switch_workspace`: switch to an authorized workspace by name.
+
+The filesystem primitives return structured byte counts and truncation metadata. `list_files` defaults to shallow listing (`recursive: false`) and supports bounded `max_depth` plus `include`/`exclude` globs; `read_file` supports optional flat `start_line`/`end_line` fields and line numbers; `read_files` keeps a structured `files` array with flat per-file `start_line`/`end_line` fields and applies per-file and total byte budgets; `search_text` supports case sensitivity, regex, globs, surrounding context, and output limits; `exec_command` reports duration, byte counts, output truncation, timeout state, and non-zero exit codes without turning them into Action errors.
+
+The public Action response vocabulary is intentionally compact: file paths use `path`, file sizes use `size_bytes` and `returned_bytes`, selected line ranges use `start_line` and `end_line`, search matches use `matched_text` and `line_text`, `workspace_status` returns one `active_workspace` object, the authorized `workspaces` list, and `access`, and errors use `{error: {code, message}}`.
 
 ## Security Model
 

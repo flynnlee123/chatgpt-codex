@@ -91,8 +91,12 @@ class CliTests(unittest.TestCase):
             self.assertIn("https://actions.example.com/openapi.json", output)
             self.assertIn("Bearer", output)
             self.assertIn("Only me", output)
-            self.assertIn("workspace_status", output)
-            self.assertIn("switch_workspace", output)
+            self.assertIn("getWorkspaceStatus", output)
+            self.assertIn("switchWorkspace", output)
+            self.assertIn("readFiles", output)
+            self.assertNotIn("listWorkspaces", output)
+            self.assertNotIn("workspace_status", output)
+            self.assertNotIn("switch_workspace", output)
 
     def test_workspace_cli_adds_lists_and_switches_authorized_workspaces(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -357,6 +361,7 @@ class CliTests(unittest.TestCase):
         self.assertEqual(exit_code, 0)
         self.assertTrue(result["ok"])
         self.assertIn("workspace_status", check_names)
+        self.assertIn("read_files", check_names)
         self.assertIn("write_file", check_names)
         self.assertIn("apply_patch", check_names)
         self.assertIn("exec_command", check_names)
