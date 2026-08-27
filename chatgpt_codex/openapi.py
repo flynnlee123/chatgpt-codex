@@ -24,6 +24,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
                 "post": {
                     "operationId": "getWorkspaceStatus",
                     "summary": "Show the active local workspace and all authorized workspaces. / 显示当前本地工作区和所有已授权工作区。",
+                    "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _optional_request_body("EmptyRequest"),
                     "responses": {"200": _json_response("Workspace status", "WorkspaceStatusResult")},
@@ -33,6 +34,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
                 "post": {
                     "operationId": "listWorkspaces",
                     "summary": "List authorized workspaces that can be selected in this GPT chat. / 列出此 GPT 对话中可切换的已授权工作区。",
+                    "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _optional_request_body("EmptyRequest"),
                     "responses": {"200": _json_response("Workspace list", "WorkspaceListResult")},
@@ -51,6 +53,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
                 "post": {
                     "operationId": "listFiles",
                     "summary": "List files and directories inside the configured workspace. / 列出配置工作区内的文件和目录。",
+                    "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("ListFilesRequest"),
                     "responses": {"200": _json_response("File listing", "FileListingResult")},
@@ -60,6 +63,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
                 "post": {
                     "operationId": "readFile",
                     "summary": "Read a UTF-8 file inside the configured workspace. / 读取配置工作区内的 UTF-8 文件。",
+                    "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("ReadFileRequest"),
                     "responses": {"200": _json_response("File content", "ReadFileResult")},
@@ -69,6 +73,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
                 "post": {
                     "operationId": "searchText",
                     "summary": "Search text inside workspace files. / 搜索工作区文件文本。",
+                    "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("SearchTextRequest"),
                     "responses": {"200": _json_response("Search results", "SearchResult")},
@@ -78,6 +83,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
                 "post": {
                     "operationId": "writeFile",
                     "summary": "Create or replace a UTF-8 file inside the workspace. / 在工作区内创建或替换 UTF-8 文件。",
+                    "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("WriteFileRequest"),
                     "responses": {"200": _json_response("Write result", "WriteFileResult")},
@@ -87,6 +93,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
                 "post": {
                     "operationId": "applyPatch",
                     "summary": "Apply a limited apply_patch-style patch inside the workspace. / 在工作区内应用受限的 apply_patch 风格补丁。",
+                    "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("PatchRequest"),
                     "responses": {"200": _json_response("Patch result", "PatchResult")},
@@ -96,6 +103,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
                 "post": {
                     "operationId": "execCommand",
                     "summary": "Run a shell command inside the workspace after safety checks. / 通过安全检查后在工作区内运行 shell 命令。",
+                    "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("CommandRequest"),
                     "responses": {"200": _json_response("Command result", "CommandResult")},

@@ -1,5 +1,7 @@
 import hmac
 import json
+import re
+import sys
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Lock
@@ -25,6 +27,28 @@ ChatGPT Codex 运行在你自己的电脑上。
 # small enough to stop a trivial memory-exhaustion attempt over a public URL.
 # 单个请求体上限：足够真实文件写入，又能挡住公网 URL 上的简单内存耗尽尝试。
 MAX_REQUEST_BODY_BYTES = 50 * 1024 * 1024
+MAX_LOG_VALUE_CHARS = 2000
+MAX_LOG_INPUT_CHARS = 12000
+LOG_SECRET_KEY_PARTS = ("authorization", "cookie", "password", "secret", "token", "api_key")
+BEARER_PATTERN = re.compile(r"Bearer\s+[A-Za-z0-9._~+/=-]+", flags=re.IGNORECASE)
+
+
+def _redact_log_value(value: Any, key: str = "") -> Any:
+    """Redact obvious secrets and bound request values before logging."""
+
+    lowered_key = key.lower()
+    if any(part in lowered_key for part in LOG_SECRET_KEY_PARTS):
+        return "[REDACTED]"
+    if isinstance(value, dict):
+        return {str(item_key): _redact_log_value(item, str(item_key)) for item_key, item in value.items()}
+    if isinstance(value, list):
+        return [_redact_log_value(item, key) for item in value]
+    if isinstance(value, str):
+        redacted = BEARER_PATTERN.sub("Bearer [REDACTED]", value)
+        if len(redacted) > MAX_LOG_VALUE_CHARS:
+            return redacted[:MAX_LOG_VALUE_CHARS] + "... [truncated]"
+        return redacted
+    return value
 
 
 def create_server(config: AppConfig, config_file: Optional[Path] = None) -> ThreadingHTTPServer:
@@ -140,14 +164,31 @@ def create_server(config: AppConfig, config_file: Optional[Path] = None) -> Thre
                 self._send_json({"error": "not found"}, status=404)
                 return
             try:
-                self._send_json(action(self._read_json()))
+                body = self._read_json()
+                self._log_action_input(body)
+                self._send_json(action(body))
             except KeyError as exc:
                 self._send_json({"error": f"missing required field: {exc.args[0]}"}, status=400)
             except Exception as exc:
                 self._send_json({"error": str(exc)}, status=400)
 
         def log_message(self, format, *args):
-            return
+            # Keep the standard HTTP access log, but send it to the process's
+            # original stdout so PM2 does not classify it as an error and CLI
+            # callers that capture stdout do not receive interleaved log lines.
+            message = "%s - - [%s] %s" % (
+                self.address_string(),
+                self.log_date_time_string(),
+                format % args,
+            )
+            output = getattr(sys, "__stdout__", None) or sys.stdout
+            print(message, file=output, flush=True)
+
+        def _log_action_input(self, body: Dict[str, Any]) -> None:
+            safe_body = json.dumps(_redact_log_value(body), ensure_ascii=False, separators=(",", ":"))
+            if len(safe_body) > MAX_LOG_INPUT_CHARS:
+                safe_body = safe_body[:MAX_LOG_INPUT_CHARS] + "... [truncated]"
+            self.log_message("action_input path=%s params=%s", self.path, safe_body)
 
         def _auth_error(self):
             with config_lock:

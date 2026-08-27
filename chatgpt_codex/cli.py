@@ -776,6 +776,10 @@ def _verify_post(url: str, body: dict, token: str, timeout: int) -> dict:
 
 
 def _verify_request(request: Request, timeout: int, url: str) -> dict:
+    # Some Cloudflare zones block the default Python-urllib user agent. Use an
+    # explicit verifier identity so the health/schema checks are distinguishable
+    # from anonymous automated traffic.
+    request.add_header("User-Agent", "ChatGPTCodexVerifier/0.1")
     opener = build_opener(ProxyHandler({}))
     try:
         response = opener.open(request, timeout=max(1, int(timeout or 10)))
