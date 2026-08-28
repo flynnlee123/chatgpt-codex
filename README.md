@@ -203,7 +203,7 @@ Low-level commands are still available for advanced use: `chatgpt-codex rotate-t
 8. Save the final public URL with `channel renew --public-base-url <url>` or `set-public-url`.
 9. Run `api-smoke` for direct interface testing, then `verify` against the running route.
 10. Configure ChatGPT Builder with `builder configure --mode ui`, or use `builder sniff` plus `builder configure --mode api` after route validation.
-11. In GPT chat, use `getWorkspaceStatus` and `switchWorkspace` before file or command work.
+11. In GPT chat, use `getWorkspaceStatus` on demand, proactively read applicable `AGENTS.md`, and give a brief progress update at least every 10 seconds while waiting on a long command.
 
 ## Manual Setup
 
@@ -285,7 +285,7 @@ Switch to notes.
 List the current directory.
 ```
 
-The GPT should call `getWorkspaceStatus` and `switchWorkspace`, then show the active local directory before file, code, or command work. `getWorkspaceStatus` includes the authorized workspace list.
+The GPT should call `getWorkspaceStatus` when the current workspace is relevant or before switching projects, then use `switchWorkspace` only with an authorized workspace name and briefly state the active local directory after switching. At the start of real project work, it should proactively read applicable `AGENTS.md` or `AGENTS.override.md`. When a command takes a while, it should keep the user updated with a brief progress note at least every 10 seconds while waiting.
 
 ## ChatGPT Builder Setup
 
@@ -341,7 +341,7 @@ In ChatGPT Builder:
 - `workspace_status`: show the active workspace name and local path.
 - `switch_workspace`: switch to an authorized workspace by name.
 
-The filesystem primitives return structured byte counts and truncation metadata. `list_files` defaults to shallow listing (`recursive: false`) and supports bounded `max_depth` plus `include`/`exclude` globs; `read_file` supports optional flat `start_line`/`end_line` fields and line numbers; `read_files` keeps a structured `files` array with flat per-file `start_line`/`end_line` fields and applies per-file and total byte budgets; `search_text` supports case sensitivity, regex, globs, surrounding context, and output limits; `exec_command` reports duration, byte counts, output truncation, timeout state, and non-zero exit codes without turning them into Action errors.
+The filesystem primitives return structured byte counts and truncation metadata. `list_files` defaults to shallow listing (`recursive: false`) and supports bounded `max_depth` plus `include`/`exclude` globs; `read_file` supports optional flat `start_line`/`end_line` fields and line numbers; `read_files` keeps a structured `files` array with flat per-file `start_line`/`end_line` fields and applies per-file and total byte budgets; `search_text` supports case sensitivity, regex, globs, surrounding context, and output limits; `exec_command` returns the final synchronous command result with duration, byte counts, output truncation, timeout state, and non-zero exit codes without turning them into Action errors.
 
 The public Action response vocabulary is intentionally compact: file paths use `path`, file sizes use `size_bytes` and `returned_bytes`, selected line ranges use `start_line` and `end_line`, search matches use `matched_text` and `line_text`, `workspace_status` returns one `active_workspace` object, the authorized `workspaces` list, and `access`, and errors use `{error: {code, message}}`.
 

@@ -1,4 +1,5 @@
 import json
+import sys
 import tempfile
 import threading
 import unittest
@@ -129,6 +130,41 @@ class ServerTests(unittest.TestCase):
                 self.assertEqual(body["files"][0]["start_line"], 2)
                 self.assertEqual(body["files"][0]["end_line"], 2)
                 self.assertEqual(body["files"][1]["error"]["code"], "file_not_found")
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=5)
+
+    def test_exec_command_returns_final_result(self):
+        with tempfile.TemporaryDirectory() as workspace:
+            root = Path(workspace)
+            server = create_server(
+                AppConfig(
+                    token="secret-token",
+                    workspaces={"default": root},
+                    active_workspace="default",
+                    host="127.0.0.1",
+                    port=0,
+                    public_base_url="https://actions.example.com",
+                )
+            )
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                base = f"http://127.0.0.1:{server.server_port}"
+                command = "\"" + sys.executable + "\" -c \"print('done')\""
+                result = post_json(
+                    base + "/exec_command",
+                    {
+                        "command": command,
+                        "timeout_seconds": 5,
+                        "max_stdout_bytes": 1024,
+                    },
+                )
+
+                self.assertEqual(result["exit_code"], 0)
+                self.assertEqual(result["stdout"].strip(), "done")
+                self.assertFalse(result["timed_out"])
             finally:
                 server.shutdown()
                 server.server_close()

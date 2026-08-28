@@ -12,7 +12,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
         "openapi": "3.1.0",
         "info": {
             "title": "ChatGPT Codex Local Actions",
-            "version": "0.4.0",
+            "version": "0.5.0",
             "description": "Local workspace coding actions for a user-owned ChatGPT Custom GPT. / 给用户自己的 Custom GPT 使用的本地工作区编程 Actions。",
         },
         "servers": [{"url": base_url}],
@@ -23,7 +23,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
             "/workspace_status": {
                 "post": {
                     "operationId": "getWorkspaceStatus",
-                    "summary": "Show the active local workspace and all authorized workspaces. / 显示当前本地工作区和所有已授权工作区。",
+                    "summary": "Show the active local workspace and all authorized workspaces.",
                     "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _optional_request_body("EmptyRequest"),
@@ -33,7 +33,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
             "/switch_workspace": {
                 "post": {
                     "operationId": "switchWorkspace",
-                    "summary": "Switch the active workspace by authorized workspace name. / 按已授权工作区名称切换当前工作区。",
+                    "summary": "Switch the active workspace by authorized workspace name.",
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("SwitchWorkspaceRequest"),
                     "responses": _action_responses("Workspace status", "WorkspaceStatusResult"),
@@ -42,7 +42,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
             "/list_files": {
                 "post": {
                     "operationId": "listFiles",
-                    "summary": "List files and directories inside the active workspace with bounded depth and include/exclude globs. Use shallow depth first when exploring an unfamiliar project. / 在当前工作区内按有限深度和 include/exclude glob 列出文件与目录；探索陌生项目时先使用浅层深度。",
+                    "summary": "List files and directories inside the active workspace with bounded depth and include/exclude globs. Use shallow depth first when exploring an unfamiliar project.",
                     "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("ListFilesRequest"),
@@ -52,7 +52,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
             "/read_file": {
                 "post": {
                     "operationId": "readFile",
-                    "summary": "Read a UTF-8 file inside the active workspace. Supports optional line ranges for reading only the relevant section of large source files. Prefer line ranges after locating a symbol with searchText. / 读取当前工作区内的 UTF-8 文件；支持按行范围读取大源文件的相关片段，搜索到符号后优先使用行范围。",
+                    "summary": "Read a UTF-8 file inside the active workspace. Supports optional line ranges for reading only the relevant section of large source files. Prefer line ranges after locating a symbol with searchText.",
                     "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("ReadFileRequest"),
@@ -62,7 +62,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
             "/read_files": {
                 "post": {
                     "operationId": "readFiles",
-                    "summary": "Read multiple known UTF-8 workspace files in one call. Prefer this over repeated readFile calls when several independent files need to be inspected together. / 一次读取多个已知 UTF-8 工作区文件；需要同时查看多个独立文件时优先使用。",
+                    "summary": "Read multiple known UTF-8 workspace files in one call. Prefer this over repeated readFile calls when several independent files need to be inspected together.",
                     "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("ReadFilesRequest"),
@@ -72,7 +72,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
             "/search_text": {
                 "post": {
                     "operationId": "searchText",
-                    "summary": "Recursively search text inside workspace files with regex, include/exclude globs, surrounding context, and bounded results. Prefer this over execCommand with rg for normal source-code searches. / 在工作区文件中递归搜索文本，支持正则、include/exclude glob、上下文和结果限制；普通源码搜索优先使用此 Action。",
+                    "summary": "Recursively search text inside workspace files with regex, include/exclude globs, surrounding context, and bounded results. Prefer this over execCommand with rg for normal source-code searches.",
                     "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("SearchTextRequest"),
@@ -82,7 +82,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
             "/write_file": {
                 "post": {
                     "operationId": "writeFile",
-                    "summary": "Create or replace a UTF-8 file inside the workspace. / 在工作区内创建或替换 UTF-8 文件。",
+                    "summary": "Create or replace a UTF-8 file inside the workspace.",
                     "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("WriteFileRequest"),
@@ -92,7 +92,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
             "/apply_patch": {
                 "post": {
                     "operationId": "applyPatch",
-                    "summary": "Apply a limited apply_patch-style patch inside the workspace. / 在工作区内应用受限的 apply_patch 风格补丁。",
+                    "summary": "Apply a limited apply_patch-style patch inside the workspace.",
                     "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("PatchRequest"),
@@ -102,7 +102,7 @@ def make_openapi_document(public_base_url: str) -> Dict[str, object]:
             "/exec_command": {
                 "post": {
                     "operationId": "execCommand",
-                    "summary": "Run a shell command inside the active workspace after safety checks. Use for workflows that are not efficiently represented by the filesystem and search primitives. Non-zero exit codes are returned as command results. / 通过安全检查后在当前工作区内运行 shell 命令；适合基础文件和搜索工具难以表达的流程，非零退出码作为正常命令结果返回。",
+                    "summary": "Run a shell command inside the active workspace after safety checks and return the final stdout, stderr, exit code, and timeout state.",
                     "x-openai-isConsequential": False,
                     "security": [{"bearerAuth": []}],
                     "requestBody": _request_body("CommandRequest"),

@@ -8,7 +8,7 @@ class OpenApiTests(unittest.TestCase):
         document = make_openapi_document("https://actions.example.com")
 
         self.assertEqual(document["servers"][0]["url"], "https://actions.example.com")
-        self.assertEqual(document["info"]["version"], "0.4.0")
+        self.assertEqual(document["info"]["version"], "0.5.0")
         for path in ["/workspace_status", "/switch_workspace", "/list_files", "/read_file", "/read_files", "/search_text", "/write_file", "/apply_patch", "/exec_command"]:
             with self.subTest(path=path):
                 response = document["paths"][path]["post"]["responses"]["200"]
@@ -52,7 +52,14 @@ class OpenApiTests(unittest.TestCase):
         self.assertNotIn("text", components["SearchMatch"]["properties"])
         self.assertIn("context_before", components["SearchTextRequest"]["properties"])
         self.assertIn("timed_out", components["CommandResult"]["properties"])
+        self.assertNotIn("status", components["CommandResult"]["properties"])
+        self.assertNotIn("command_id", components["CommandResult"]["properties"])
+        self.assertNotIn("next_stdout_cursor", components["CommandResult"]["properties"])
+        self.assertNotIn("next_stderr_cursor", components["CommandResult"]["properties"])
+        self.assertNotIn("yield_seconds", components["CommandRequest"]["properties"])
+        self.assertNotIn("PollCommandRequest", components)
         self.assertEqual(components["ErrorInfo"]["required"], ["code", "message"])
+        self.assertNotIn("/poll_command", document["paths"])
 
         for path in document["paths"]:
             if path in ["/health", "/openapi.json", "/privacy"]:

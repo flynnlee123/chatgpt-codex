@@ -8,7 +8,7 @@ from threading import Lock
 from typing import Any, Callable, Dict, Optional
 
 from .config import AppConfig, load_config, save_config
-from .executor import CommandExecutor
+from .executor import CommandManager
 from .openapi import make_openapi_document
 from .workspace import (
     DEFAULT_BATCH_MAX_BYTES_PER_FILE,
@@ -68,6 +68,7 @@ def create_server(config: AppConfig, config_file: Optional[Path] = None) -> Thre
     """
 
     config_lock = Lock()
+    command_manager = CommandManager()
 
     def reload_config_locked() -> None:
         if config_file is None or not Path(config_file).exists():
@@ -85,7 +86,7 @@ def create_server(config: AppConfig, config_file: Optional[Path] = None) -> Thre
         with config_lock:
             reload_config_locked()
             workspace = config.active_workspace_path()
-        return WorkspaceTools(workspace), CommandExecutor(workspace)
+        return WorkspaceTools(workspace), workspace
 
     def persist_config() -> None:
         if config_file is not None:
@@ -155,7 +156,7 @@ def create_server(config: AppConfig, config_file: Optional[Path] = None) -> Thre
                 payload, status = auth_error
                 self._send_json(payload, status=status)
                 return
-            workspace_tools, executor = current_tools()
+            workspace_tools, workspace = current_tools()
             actions: Dict[str, Callable[[Dict[str, Any]], Dict[str, object]]] = {
                 "/workspace_status": lambda body: workspace_status(),
                 "/switch_workspace": lambda body: switch_workspace(body["name"]),
@@ -195,7 +196,8 @@ def create_server(config: AppConfig, config_file: Optional[Path] = None) -> Thre
                 ),
                 "/write_file": lambda body: workspace_tools.write_file(body["path"], body.get("content", "")),
                 "/apply_patch": lambda body: workspace_tools.apply_patch(body["patch"]),
-                "/exec_command": lambda body: executor.run(
+                "/exec_command": lambda body: command_manager.exec_command(
+                    workspace=workspace,
                     command=body["command"],
                     cwd=body.get("cwd", "."),
                     timeout_seconds=int(body.get("timeout_seconds", 60)),

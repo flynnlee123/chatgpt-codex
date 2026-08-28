@@ -1,11 +1,12 @@
 import subprocess
 import time
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Optional
 
 from .security import CommandPolicy, PathSandbox
 
-
+DEFAULT_COMMAND_TIMEOUT_SECONDS = 60
+DEFAULT_COMMAND_OUTPUT_BYTES = 20000
 class CommandExecutor:
     """Run shell commands inside the workspace after safety checks.
 
@@ -27,8 +28,8 @@ class CommandExecutor:
     ) -> Dict[str, object]:
         safe_command = self.policy.validate(command)
         safe_cwd = self.sandbox.resolve(cwd)
-        stdout_limit = max(1, int(max_stdout_bytes or max_output or 20000))
-        stderr_limit = max(1, int(max_stderr_bytes or max_output or 20000))
+        stdout_limit = max(1, int(max_stdout_bytes or max_output or DEFAULT_COMMAND_OUTPUT_BYTES))
+        stderr_limit = max(1, int(max_stderr_bytes or max_output or DEFAULT_COMMAND_OUTPUT_BYTES))
         started = time.monotonic()
         timed_out = False
         exit_code = None
@@ -42,7 +43,7 @@ class CommandExecutor:
                 text=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
-                timeout=max(1, int(timeout_seconds or 60)),
+                timeout=max(1, int(timeout_seconds or DEFAULT_COMMAND_TIMEOUT_SECONDS)),
             )
             exit_code = completed.returncode
             stdout_raw = _as_text(completed.stdout)
@@ -70,6 +71,30 @@ class CommandExecutor:
         }
 
 
+class CommandManager:
+    """Keep the command entry point stable while commands remain synchronous."""
+
+    def __init__(self, policy=None):
+        self.policy = policy or CommandPolicy()
+
+    def exec_command(
+        self,
+        workspace: Path,
+        command: str,
+        cwd: str = ".",
+        timeout_seconds: int = DEFAULT_COMMAND_TIMEOUT_SECONDS,
+        max_stdout_bytes: Optional[int] = None,
+        max_stderr_bytes: Optional[int] = None,
+    ) -> Dict[str, object]:
+        return CommandExecutor(workspace=Path(workspace), policy=self.policy).run(
+            command=command,
+            cwd=cwd,
+            timeout_seconds=timeout_seconds,
+            max_stdout_bytes=max_stdout_bytes,
+            max_stderr_bytes=max_stderr_bytes,
+        )
+
+
 def _as_text(value) -> str:
     if value is None:
         return ""
@@ -83,8 +108,9 @@ def _utf8_size(value: str) -> int:
 
 
 def _truncate(value: str, max_output: int):
-    limit = max(1, int(max_output or 20000))
+    limit = max(1, int(max_output or DEFAULT_COMMAND_OUTPUT_BYTES))
     data = value.encode("utf-8")
     if len(data) <= limit:
         return value, False
     return data[:limit].decode("utf-8", errors="ignore"), True
+

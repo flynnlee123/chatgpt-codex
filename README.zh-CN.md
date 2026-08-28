@@ -203,7 +203,7 @@ chatgpt-codex channel renew --ttl-minutes 120
 8. 用 `channel renew --public-base-url <url>` 或 `set-public-url` 保存最终公网 URL。
 9. 先运行 `api-smoke` 做直接接口测试，再对运行中的入口运行 `verify`。
 10. 用 `builder configure --mode ui` 配置 ChatGPT Builder，或在 route 验证后使用 `builder sniff` 加 `builder configure --mode api`。
-11. 在 GPT 对话里，文件或命令操作前使用 `getWorkspaceStatus` 和 `switchWorkspace`。
+11. 在 GPT 对话里，按需使用 `getWorkspaceStatus`，主动读取适用的 `AGENTS.md`，并在等待长命令时至少每 10 秒简要汇报一次进展。
 
 ## 手动配置
 
@@ -285,7 +285,7 @@ chatgpt-codex workspace list
 列一下当前目录
 ```
 
-GPT 应调用 `getWorkspaceStatus` 和 `switchWorkspace`，并在文件、代码或命令操作前显示当前本地目录。`getWorkspaceStatus` 已包含授权 workspace 列表。
+GPT 应在当前 workspace 相关、要切换项目，或 workspace 状态有歧义时调用 `getWorkspaceStatus`；只用它返回的已授权名称调用 `switchWorkspace`，并在切换后简要说明当前本地目录。开始实质项目工作时，应主动读取适用的 `AGENTS.md` 或 `AGENTS.override.md`。当命令执行时间较长时，等待期间至少每 10 秒给用户一个简短进展更新。
 
 ## ChatGPT Builder 配置
 
@@ -341,7 +341,7 @@ chatgpt-codex gpt-instructions
 - `workspace_status`：显示当前 workspace 名称和本地路径。
 - `switch_workspace`：按名称切换到已授权 workspace。
 
-文件系统 primitive 会返回结构化字节数和截断元数据。`list_files` 默认只列出浅层内容（`recursive: false`），并支持有限 `max_depth` 以及 `include`/`exclude` glob；`read_file` 支持扁平的可选 `start_line`/`end_line` 和行号；`read_files` 保留结构化 `files` 数组，但每个元素使用扁平的 `start_line`/`end_line`，并支持单文件与总字节预算；`search_text` 支持大小写、正则、glob、前后文和输出限制；`exec_command` 会返回耗时、字节数、输出截断、超时状态，非零退出码也作为正常命令结果返回。
+文件系统 primitive 会返回结构化字节数和截断元数据。`list_files` 默认只列出浅层内容（`recursive: false`），并支持有限 `max_depth` 以及 `include`/`exclude` glob；`read_file` 支持扁平的可选 `start_line`/`end_line` 和行号；`read_files` 保留结构化 `files` 数组，但每个元素使用扁平的 `start_line`/`end_line`，并支持单文件与总字节预算；`search_text` 支持大小写、正则、glob、前后文和输出限制；`exec_command` 同步返回最终命令结果，包括耗时、字节数、输出截断、超时状态，非零退出码也作为正常命令结果返回。
 
 公开 Action 返回字段保持精简且统一：文件路径统一使用 `path`，文件大小使用 `size_bytes` 和 `returned_bytes`，代码行范围使用 `start_line` 和 `end_line`，搜索命中使用 `matched_text` 和 `line_text`；`workspace_status` 返回一个 `active_workspace` 对象、授权 `workspaces` 列表和 `access`；错误统一为 `{error: {code, message}}`。
 

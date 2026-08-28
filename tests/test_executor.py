@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from chatgpt_codex.executor import CommandExecutor
+from chatgpt_codex.executor import CommandExecutor, CommandManager
 
 
 class CommandExecutorTests(unittest.TestCase):
@@ -40,6 +40,22 @@ class CommandExecutorTests(unittest.TestCase):
             self.assertIsNone(result["exit_code"])
             self.assertTrue(result["timed_out"])
             self.assertIn("timed_out", result)
+
+    def test_command_manager_executes_synchronously(self):
+        with tempfile.TemporaryDirectory() as workspace:
+            manager = CommandManager()
+            command = f'"{sys.executable}" -c "print(\'done\')"'
+
+            result = manager.exec_command(
+                workspace=Path(workspace),
+                command=command,
+                timeout_seconds=5,
+                max_stdout_bytes=1024,
+            )
+
+            self.assertEqual(result["exit_code"], 0)
+            self.assertEqual(result["stdout"].strip(), "done")
+            self.assertFalse(result["timed_out"])
 
 
 if __name__ == "__main__":

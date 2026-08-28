@@ -820,7 +820,7 @@ def _api_smoke(timeout: int) -> dict:
         checks = []
         try:
             checks.append(_api_check("health", lambda: _api_get(f"{base_url}/health", timeout), lambda body: body["ok"] and body["active_workspace"] == "alpha"))
-            checks.append(_api_check("openapi", lambda: _api_get(f"{base_url}/openapi.json", timeout), lambda body: body["servers"][0]["url"] == base_url and "/read_files" in body["paths"] and "/exec_command" in body["paths"] and "/list_workspaces" not in body["paths"]))
+            checks.append(_api_check("openapi", lambda: _api_get(f"{base_url}/openapi.json", timeout), lambda body: body["servers"][0]["url"] == base_url and "/read_files" in body["paths"] and "/exec_command" in body["paths"] and "/poll_command" not in body["paths"] and "/list_workspaces" not in body["paths"]))
             checks.append(_api_check_status("auth_required", lambda: _api_post(f"{base_url}/workspace_status", {}, "", timeout), 401))
             checks.append(_api_check("workspace_status", lambda: _api_post(f"{base_url}/workspace_status", {}, config.token, timeout), lambda body: body["active_workspace"]["name"] == "alpha" and body["active_workspace"]["path"] == str(alpha.resolve()) and [item["name"] for item in body["workspaces"]] == ["alpha", "beta"]))
             checks.append(_api_check("list_files", lambda: _api_post(f"{base_url}/list_files", {"path": "."}, config.token, timeout), lambda body: body["entries"][0]["path"] == "alpha.txt"))

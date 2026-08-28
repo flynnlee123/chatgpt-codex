@@ -330,17 +330,17 @@ In the GPT conversation, project switching flow is:
 
 GPT 对话中的项目切换流程：
 
-1. Call `workspace_status` before file, code, or command work and show the current local directory.
-2. Call `workspace_status` when the user asks what projects are available.
-3. Call `switch_workspace` only with an authorized workspace name.
-4. After switching, state the active workspace name and local path.
+1. Call `getWorkspaceStatus` on demand: when the user asks about the current project, the active workspace is ambiguous, the user wants to switch projects, or a workspace-related Action fails.
+2. When the user wants to switch projects, call `getWorkspaceStatus` first, then use `switchWorkspace` only with an authorized workspace name from that result.
+3. At the start of real project work, proactively check the applicable `AGENTS.md` / `AGENTS.override.md` for the current scope.
+4. If `execCommand` returns a running command session, continue with `pollCommand` instead of restarting the same command.
 
 中文：
 
-1. 文件、代码或命令操作前调用 `workspace_status`，并显示当前本地目录。
-2. 用户询问可用项目时调用 `workspace_status`。
-3. 只用已授权工作区名称调用 `switch_workspace`。
-4. 切换后说明当前工作区名称和本地路径。
+1. 按需调用 `getWorkspaceStatus`：当用户询问当前项目、当前 workspace 有歧义、要切换项目，或 workspace 相关 Action 异常时使用。
+2. 用户要求切换项目时，先调用 `getWorkspaceStatus` 获取已授权 workspace，再用 `switchWorkspace` 切换。
+3. 开始实质项目工作时，主动检查当前 scope 适用的 `AGENTS.md` / `AGENTS.override.md`。
+4. 如果 `execCommand` 返回仍在运行的 command session，用 `pollCommand` 续读输出，不要重启同一个命令。
 
 ## Verification / 验证
 

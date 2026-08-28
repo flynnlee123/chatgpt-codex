@@ -13,4 +13,7 @@ build/
 
 # Local secrets and per-machine state.
 .chatgpt-codex/
+.chatgpt-codex-labs/
+.chatgpt-work/
+.chatgpt-labs/
 *.log
